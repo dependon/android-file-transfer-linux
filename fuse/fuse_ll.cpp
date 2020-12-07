@@ -38,6 +38,15 @@
 
 #include <fuse_lowlevel.h>
 
+#include <sys/stat.h>
+struct deviceInfo
+{
+    std::string _Manufacturer;
+    std::string _Model;
+    std::string _DeviceVersion;
+    std::string _SerialNumber;
+    std::string _devicePath;
+};
 namespace
 {
 	using namespace mtp::fuse;
@@ -315,7 +324,9 @@ namespace
 			{
 				mtp::msg::ObjectInfo oi;
 				oi.Filename = filename;
+                mtp::debug(oi.Filename);
 				oi.ObjectFormat = format;
+                mtp::debug(oi.ObjectFormat);
 				noi = _session->SendObjectInfo(oi, storageId, parentId);
 				_session->SendObject(std::make_shared<mtp::ByteArrayObjectInputStream>(mtp::ByteArray()));
 			}
@@ -346,7 +357,7 @@ namespace
 			entry.attr = GetObjectAttr(objectId);
 
 			if (createInfo)
-				entry.ReplyCreate(createInfo);
+                entry.ReplyCreate(createInfo);
 			else
 				entry.Reply();
 		}
@@ -376,7 +387,7 @@ namespace
 			return true;
 		}
 
-	public:
+    public:
 		FuseWrapper(bool claimInterface): _claimInterface(claimInterface)
 		{ Connect(); }
 
@@ -389,12 +400,15 @@ namespace
 			_objectAttrs.clear();
 			_directoryCache.clear();
 			_session.reset();
-			_device.reset();
-			_device = mtp::Device::FindFirst(_claimInterface);
+            _device.reset();
+            _device = mtp::Device::FindFirst(_claimInterface);
 			if (!_device)
-				throw std::runtime_error("no MTP device found");
+            {
+                throw std::runtime_error("no MTP device found");
+            }
 
 			_session = _device->OpenSession(1);
+
 			_editObjectSupported = _session->EditObjectSupported();
 			if (!_editObjectSupported)
 				mtp::error("your device does not have android EditObject extension, mounting read-only\n");
@@ -406,6 +420,19 @@ namespace
 			PopulateStorages();
 		}
 
+        deviceInfo getDeviceInfo()
+        {
+            deviceInfo info;
+            if(_session)
+           {
+                info._Manufacturer=_session->GetDeviceInfo().Manufacturer;
+                info._Model=_session->GetDeviceInfo().Model;
+                info._DeviceVersion=_session->GetDeviceInfo().DeviceVersion;
+                info._SerialNumber=_session->GetDeviceInfo().SerialNumber;
+                info._devicePath=_device->GetPacketer().GetPipe()->GetInterface()->GetPath();
+            }
+            return info;
+        }
 		void PopulateStorages()
 		{
 			_storageIdList.clear();
@@ -418,6 +445,7 @@ namespace
 				mtp::StorageId id = ids.StorageIDs[i];
 				mtp::msg::StorageInfo si = _session->GetStorageInfo(id);
 				std::string path = si.GetName();
+                mtp::debug(path);
 				if (path.empty())
 				{
 					char buf[64];
@@ -714,120 +742,228 @@ namespace
 
 		conn->async_read = 0;
 		conn->want &= ~FUSE_CAP_ASYNC_READ;
-		try { g_wrapper->Init(userdata, conn); } catch (const std::exception &ex) { mtp::error("init failed:", ex.what()); }
+        try { g_wrapper->Init(userdata, conn); } catch (const std::exception &ex) { mtp::error("init failed:", ex.what()); }
 	}
 
 	void Lookup (fuse_req_t req, fuse_ino_t parent, const char *name)
-	{ mtp::debug("   Lookup ", parent, " ", name); WRAP_EX(g_wrapper->Lookup(req, FuseId(parent), name)); }
+    { mtp::debug("   Lookup ", parent, " ", name); WRAP_EX(g_wrapper->Lookup(req, FuseId(parent), name)); }
 
 	void ReadDir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi)
-	{ mtp::debug("   Readdir ", ino, " ", size, " ", off); WRAP_EX(g_wrapper->ReadDir(req, FuseId(ino), size, off, fi)); }
+    { mtp::debug("   Readdir ", ino, " ", size, " ", off); WRAP_EX(g_wrapper->ReadDir(req, FuseId(ino), size, off, fi)); }
 
 	void GetAttr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
-	{ mtp::debug("   GetAttr ", ino); WRAP_EX(g_wrapper->GetAttr(req, FuseId(ino), fi)); }
+    { mtp::debug("   GetAttr ", ino); WRAP_EX(g_wrapper->GetAttr(req, FuseId(ino), fi)); }
 
 	void SetAttr(fuse_req_t req, fuse_ino_t ino, struct stat *attr, int to_set, struct fuse_file_info *fi)
-	{ mtp::debug("   SetAttr ", ino, " 0x", mtp::hex(to_set, 8)); WRAP_EX(g_wrapper->SetAttr(req, FuseId(ino), attr, to_set, fi)); }
+    { mtp::debug("   SetAttr ", ino, " 0x", mtp::hex(to_set, 8)); WRAP_EX(g_wrapper->SetAttr(req, FuseId(ino), attr, to_set, fi)); }
 
 	void Read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi)
-	{ mtp::debug("   Read ", ino, " ", size, " ", off); WRAP_EX(g_wrapper->Read(req, FuseId(ino), size, off, fi)); }
+    { mtp::debug("   Read ", ino, " ", size, " ", off); WRAP_EX(g_wrapper->Read(req, FuseId(ino), size, off, fi)); }
 
 	void Write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off_t off, struct fuse_file_info *fi)
-	{ mtp::debug("   Write ", ino, " ", size, " ", off); WRAP_EX(g_wrapper->Write(req, FuseId(ino), buf, size, off, fi)); }
+    { mtp::debug("   Write ", ino, " ", size, " ", off); WRAP_EX(g_wrapper->Write(req, FuseId(ino), buf, size, off, fi)); }
 
 	void MakeNode(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode, dev_t rdev)
-	{ mtp::debug("   MakeNode ", parent, " ", name, " 0x", mtp::hex(mode, 8)); WRAP_EX(g_wrapper->MakeNode(req, FuseId(parent), name, mode, rdev)); }
+    { mtp::debug("   MakeNode ", parent, " ", name, " 0x", mtp::hex(mode, 8)); WRAP_EX(g_wrapper->MakeNode(req, FuseId(parent), name, mode, rdev)); }
 
 	void Create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode, struct fuse_file_info *fi)
-	{ mtp::debug("   Create ", parent, " ", name, " 0x", mtp::hex(mode, 8)); WRAP_EX(g_wrapper->Create(req, FuseId(parent), name, mode, fi)); }
+    { mtp::debug("   Create ", parent, " ", name, " 0x", mtp::hex(mode, 8)); WRAP_EX(g_wrapper->Create(req, FuseId(parent), name, mode, fi)); }
 
 	void Open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
-	{ mtp::debug("   Open ", ino); WRAP_EX(g_wrapper->Open(req, FuseId(ino), fi)); }
+    { mtp::debug("   Open ", ino); WRAP_EX(g_wrapper->Open(req, FuseId(ino), fi)); }
 
 	void Rename(fuse_req_t req, fuse_ino_t parent, const char *name, fuse_ino_t newparent, const char *newname)
-	{ mtp::debug("   Rename ", parent, " ", name, " -> ", newparent, " ", newname); WRAP_EX(g_wrapper->Rename(req, FuseId(parent), name, FuseId(newparent), newname)); }
+    { mtp::debug("   Rename ", parent, " ", name, " -> ", newparent, " ", newname); WRAP_EX(g_wrapper->Rename(req, FuseId(parent), name, FuseId(newparent), newname)); }
 
 	void Release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
-	{ mtp::debug("   Release ", ino); WRAP_EX(g_wrapper->Release(req, FuseId(ino), fi)); }
+    { mtp::debug("   Release ", ino); WRAP_EX(g_wrapper->Release(req, FuseId(ino), fi)); }
 
 	void MakeDir(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode)
-	{ mtp::debug("   MakeDir ", parent, " ", name, " 0x", mtp::hex(mode, 8)); WRAP_EX(g_wrapper->MakeDir(req, FuseId(parent), name, mode)); }
+    { mtp::debug("   MakeDir ", parent, " ", name, " 0x", mtp::hex(mode, 8)); WRAP_EX(g_wrapper->MakeDir(req, FuseId(parent), name, mode)); }
 
 	void RemoveDir (fuse_req_t req, fuse_ino_t parent, const char *name)
-	{ mtp::debug("   RemoveDir ", parent, " ", name); WRAP_EX(g_wrapper->RemoveDir(req, FuseId(parent), name)); }
+    { mtp::debug("   RemoveDir ", parent, " ", name); WRAP_EX(g_wrapper->RemoveDir(req, FuseId(parent), name)); }
 
 	void Unlink(fuse_req_t req, fuse_ino_t parent, const char *name)
-	{ mtp::debug("   Unlink ", parent, " ", name); WRAP_EX(g_wrapper->Unlink(req, FuseId(parent), name)); }
+    { mtp::debug("   Unlink ", parent, " ", name); WRAP_EX(g_wrapper->Unlink(req, FuseId(parent), name)); }
 
 	void StatFS(fuse_req_t req, fuse_ino_t ino)
-	{ mtp::debug("   StatFS ", ino); WRAP_EX(g_wrapper->StatFS(req, FuseId(ino))); }
+    { mtp::debug("   StatFS ", ino); WRAP_EX(g_wrapper->StatFS(req, FuseId(ino))); }
 }
 
+#include <usb/Context.h>
+#include <mtp/usb/DeviceBusyException.h>
+
+std::vector <deviceInfo> GetDeviceInfo()
+{
+    std::vector <deviceInfo> stringvector;
+    mtp::DevicePtr				_device;
+    bool						_resetDevice=false;
+    bool claimInterface = true;
+    bool resetDevice = _resetDevice;
+    mtp::usb::ContextPtr ctx(new mtp::usb::Context);
+
+    auto devices = ctx->GetDevices();
+    for(mtp::usb::DeviceDescriptorPtr desc : ctx->GetDevices())
+    {
+
+        try
+        {
+            _device = mtp::Device::Open(ctx, desc, claimInterface, resetDevice);
+            //                    desc->GetPath().c_str();
+            mtp::SessionPtr _session;
+            if(_device)
+                _session= _device->OpenSession(1);
+            deviceInfo info;
+            if(_session)
+            {
+                info._Manufacturer=_session->GetDeviceInfo().Manufacturer;
+                info._Model=_session->GetDeviceInfo().Model;
+                info._DeviceVersion=_session->GetDeviceInfo().DeviceVersion;
+                info._SerialNumber=_session->GetDeviceInfo().SerialNumber;
+                info._devicePath=_device->GetPacketer().GetPipe()->GetInterface()->GetPath();
+            }
+            stringvector.push_back(info);
+        }
+        catch(const mtp::usb::DeviceBusyException &ex)
+        {
+        }
+
+    }
+
+    return stringvector;
+}
 int main(int argc, char **argv)
 {
-	bool claimInterface = true;
-	for(int i = 1; i < argc; ++i)
-	{
-		if (strcmp(argv[i], "-C") == 0)
-			claimInterface = false;
-		if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "-odebug") == 0)
-			mtp::g_debug = true;
-		if (i + 1 < argc && strcmp(argv[i], "-o") == 0 && strcmp(argv[i + 1], "debug") == 0)
-			mtp::g_debug = true;
-	}
 
-	try
-	{ g_wrapper.reset(new FuseWrapper(claimInterface)); }
-	catch(const std::exception &ex)
-	{ mtp::error("connect failed: ", ex.what()); return 1; }
+    bool claimInterface = true;
+    bool isCreateDir=false;
+    for(int i = 1; i < argc; ++i)
+    {
+        if (strcmp(argv[i], "-C") == 0)
+            claimInterface = false;
+        if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "-odebug") == 0)
+            mtp::g_debug = true;
+        if (i + 1 < argc && strcmp(argv[i], "-o") == 0 && strcmp(argv[i + 1], "debug") == 0)
+            mtp::g_debug = true;
+        if (strcmp(argv[i], "-l") == 0)
+        {
 
-	struct fuse_lowlevel_ops ops = {};
+            std::vector <deviceInfo> vecDevice=GetDeviceInfo();
+            mtp::g_debug = true;
+            for(deviceInfo info: vecDevice)
+            {
+                mtp::debug(info._Manufacturer);
+                mtp::debug(info._Model);
+                mtp::debug(info._DeviceVersion);
+                mtp::debug(info._SerialNumber);
+                mtp::debug(info._devicePath);
+            }
+             return 0;
+        }
+        if (strcmp(argv[i], "-n") == 0)
+        {
+            isCreateDir=true;
+        }
 
-	ops.init		= &Init;
-	ops.lookup		= &Lookup;
-	ops.readdir		= &ReadDir;
-	ops.getattr		= &GetAttr;
-	ops.setattr		= &SetAttr;
-	ops.mknod		= &MakeNode;
-	ops.open		= &Open;
-	ops.create		= &Create;
-	ops.read		= &Read;
-	ops.write		= &Write;
-	ops.mkdir		= &MakeDir;
-	ops.rename		= &Rename;
-	ops.release		= &Release;
-	ops.rmdir		= &RemoveDir;
-	ops.unlink		= &Unlink;
-	ops.statfs		= &StatFS;
 
-	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
-	struct fuse_chan *ch;
-	char *mountpoint;
-	int err = -1;
-	int multithreaded = 0, foreground = 0;
+    }
 
-	if (fuse_parse_cmdline(&args, &mountpoint, &multithreaded, &foreground) != -1 &&
-	    mountpoint != NULL &&
-	    (ch = fuse_mount(mountpoint, &args)) != NULL) {
-		struct fuse_session *se;
+    try
+    {
+        g_wrapper.reset(new FuseWrapper(claimInterface));
 
-		se = fuse_lowlevel_new(&args, &ops,
-				       sizeof(ops), NULL);
-		if (se != NULL) {
-			if (fuse_set_signal_handlers(se) != -1)
-			{
-				fuse_session_add_chan(se, ch);
-				if (fuse_daemonize(foreground) == -1)
-					perror("fuse_daemonize");
-				err = (multithreaded? fuse_session_loop_mt: fuse_session_loop)(se);
-				fuse_remove_signal_handlers(se);
-				fuse_session_remove_chan(ch);
-			}
-			fuse_session_destroy(se);
-		}
-		fuse_unmount(mountpoint, ch);
-	}
-	fuse_opt_free_args(&args);
+    }
+    catch(const std::exception &ex)
+    { mtp::error("connect failed: ", ex.what()); return 1; }
 
-	return err ? 1 : 0;
+
+
+
+//    int status = mkdir(dirPath.c_str(),S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+
+    struct fuse_lowlevel_ops ops = {};
+
+    ops.init		= &Init;
+    ops.lookup		= &Lookup;
+    ops.readdir		= &ReadDir;
+    ops.getattr		= &GetAttr;
+    ops.setattr		= &SetAttr;
+    ops.mknod		= &MakeNode;
+    ops.open		= &Open;
+    ops.create		= &Create;
+    ops.read		= &Read;
+    ops.write		= &Write;
+    ops.mkdir		= &MakeDir;
+    ops.rename		= &Rename;
+    ops.release		= &Release;
+    ops.rmdir		= &RemoveDir;
+    ops.unlink		= &Unlink;
+    ops.statfs		= &StatFS;
+
+
+
+    deviceInfo info =g_wrapper->getDeviceInfo();
+
+
+
+    FILE *fp = NULL;
+    char data[100] = {'0'};
+    fp = popen("echo $HOME", "r");
+    if (fp == NULL)
+    {
+        printf("popen error!\n");
+        return -1;
+    }
+    while (fgets(data, sizeof(data), fp) != NULL)
+    {
+        printf("%s", data);
+    }
+    std::string path=data;
+    path=path.substr(0,path.size()-1);
+    path+="/";
+    path += info._Manufacturer+info._SerialNumber;
+    pclose(fp);
+    char *str=(char *)path.c_str();
+    if (isCreateDir)
+    {
+        std::string dirPath="mkdir ~/"+info._Manufacturer+info._SerialNumber;
+        system(dirPath.c_str());
+        argv[argc-1]=str;
+
+    }
+
+    struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
+
+    struct fuse_chan *ch;
+    char *mountpoint;
+    int err = -1;
+    int multithreaded = 0, foreground = 0;
+
+    if (fuse_parse_cmdline(&args, &mountpoint, &multithreaded, &foreground) != -1 &&
+        mountpoint != NULL &&
+        (ch = fuse_mount(mountpoint, &args)) != NULL) {
+        struct fuse_session *se;
+
+        se = fuse_lowlevel_new(&args, &ops,
+                       sizeof(ops), NULL);
+        if (se != NULL) {
+            if (fuse_set_signal_handlers(se) != -1)
+            {
+                fuse_session_add_chan(se, ch);
+                if (fuse_daemonize(foreground) == -1)
+                    perror("fuse_daemonize");
+                err = (multithreaded? fuse_session_loop_mt: fuse_session_loop)(se);
+                fuse_remove_signal_handlers(se);
+                fuse_session_remove_chan(ch);
+            }
+            fuse_session_destroy(se);
+        }
+        fuse_unmount(mountpoint, ch);
+    }
+    fuse_opt_free_args(&args);
+
+
+    return err ? 1 : 0;
+     return 0;
 }

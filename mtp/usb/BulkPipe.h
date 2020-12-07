@@ -57,8 +57,9 @@ namespace mtp { namespace usb
 		BulkPipe(DevicePtr device, ConfigurationPtr conf, InterfacePtr interface, EndpointPtr in, EndpointPtr out, EndpointPtr interrupt, ITokenPtr claimToken);
 		~BulkPipe();
 
-		DevicePtr GetDevice() const;
-		InterfacePtr GetInterface() const;
+        DevicePtr GetDevice() const;
+
+        InterfacePtr GetInterface() const;
 
 		ByteArray ReadInterrupt(int timeout);
 

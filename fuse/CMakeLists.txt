@@ -1,6 +1,13 @@
 add_executable(aft-mtp-mount fuse_ll.cpp)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(3rd_lib REQUIRED
+    fuse
 
-target_link_libraries(aft-mtp-mount ${MTP_LIBRARIES} ${FUSE_LDFLAGS} ${CMAKE_THREAD_LIBS_INIT})
+    )
+target_include_directories(aft-mtp-mount PUBLIC ${3rd_lib_INCLUDE_DIRS} ${PROJECT_INCLUDE} )
+
+target_link_libraries(aft-mtp-mount ${3rd_lib_LIBRARIES} ${MTP_LIBRARIES} ${FUSE_LDFLAGS} ${CMAKE_THREAD_LIBS_INIT} pthread)
+
 install(TARGETS aft-mtp-mount RUNTIME DESTINATION bin)
 
 if (BUILD_QT_UI AND (${CMAKE_SYSTEM_NAME} MATCHES "Darwin"))

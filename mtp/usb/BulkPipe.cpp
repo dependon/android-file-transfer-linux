@@ -46,11 +46,13 @@ namespace mtp { namespace usb
 	BulkPipe::~BulkPipe()
 	{ }
 
-	DevicePtr BulkPipe::GetDevice() const
-	{ return _device; }
+    DevicePtr BulkPipe::GetDevice() const
+    { return _device; }
 
-	InterfacePtr BulkPipe::GetInterface() const
-	{ return _interface; }
+    InterfacePtr BulkPipe::GetInterface() const
+    {
+        return _interface;
+    }
 
 	ByteArray BulkPipe::ReadInterrupt(int timeout)
 	{

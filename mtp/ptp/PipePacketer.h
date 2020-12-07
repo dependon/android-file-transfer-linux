@@ -36,7 +36,7 @@ namespace mtp
 	public:
 		PipePacketer(const usb::BulkPipePtr &pipe): _pipe(pipe) { }
 
-		usb::BulkPipePtr GetPipe() const
+        usb::BulkPipePtr GetPipe()
 		{ return _pipe; }
 
 		void Write(const IObjectInputStreamPtr &inputStream, int timeout);

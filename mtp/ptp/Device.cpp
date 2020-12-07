@@ -33,7 +33,7 @@
 namespace mtp
 {
 
-	Device::Device(usb::BulkPipePtr pipe): _packeter(pipe)
+    Device::Device(usb::BulkPipePtr pipe): _packeter(pipe)
 	{ }
 
 	SessionPtr Device::OpenSession(u32 sessionId, int timeout)
@@ -71,8 +71,8 @@ namespace mtp
 		throw std::runtime_error("no interface descriptor found");
 	}
 
-	DevicePtr Device::Open(usb::ContextPtr ctx, usb::DeviceDescriptorPtr desc, bool claimInterface, bool resetDevice)
-	{
+    DevicePtr Device::Open(usb::ContextPtr ctx, usb::DeviceDescriptorPtr desc, bool claimInterface, bool resetDevice)
+    {
 		debug("probing device ", hex(desc->GetVendorId(), 4), ":", hex(desc->GetProductId(), 4));
 		usb::DevicePtr device = desc->TryOpen(ctx);
 		if (!device) {
@@ -100,7 +100,7 @@ namespace mtp
 			for(int j = 0; j < interfaces; ++j)
 			{
 				usb::InterfacePtr iface = conf->GetInterface(device, conf, j, 0);
-				usb::InterfaceTokenPtr token = claimInterface? device->ClaimInterface(iface): nullptr;
+                usb::InterfaceTokenPtr token = claimInterface? device->ClaimInterface(iface): nullptr;
 				debug("Device usb interface: ", i, ':', j, ", index: ", iface->GetIndex(), ", enpoints: ", iface->GetEndpointsCount());
 
 #ifdef USB_BACKEND_LIBUSB
@@ -135,7 +135,7 @@ namespace mtp
 				catch (const std::exception & ex)
 				{ debug("winusb handshake failed: ", ex.what()); }
 
-				if (name.find("MTP") == name.npos)  {
+				if (name != "MTP") {
 					auto interfaceStringIndex = GetInterfaceStringIndex(desc, j);
 					data = usb::DeviceRequest(device).GetDescriptor(usb::DescriptorType::String, interfaceStringIndex, langId);
 					HexDump("interface name", data);
@@ -147,7 +147,7 @@ namespace mtp
 					name = stream.ReadString((len - 2) / 2);
 				}
 #endif
-				if (name.find("MTP") != name.npos)
+				if (name == "MTP")
 				{
 					//device->SetConfiguration(configuration->GetIndex());
 					if (resetDevice)
@@ -174,15 +174,15 @@ namespace mtp
 
 		for (usb::DeviceDescriptorPtr desc : ctx->GetDevices())
 		try
-		{
+        {
 			auto device = Open(ctx, desc, claimInterface, resetDevice);
 			if (device)
 				return device;
 		}
 		catch(const std::exception &ex)
-		{ error("Device::Find failed:", ex.what()); }
+        { error("Device::Find failed:", ex.what()); }
 
-		return nullptr;
-	}
+        return nullptr;
+    }
 
 }

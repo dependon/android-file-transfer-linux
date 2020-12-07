@@ -53,7 +53,10 @@ namespace mtp { namespace usb
 		{ return _subclass; }
 
 		int GetIndex() const
-		{ return _index; }
+        { return _index; }
+
+        std::string GetPath() const
+        { return _path; }
 
 		EndpointPtr GetEndpoint(int idx) const
 		{ return _endpoints.at(idx); }

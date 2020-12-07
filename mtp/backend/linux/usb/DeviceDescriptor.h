@@ -70,7 +70,8 @@ namespace mtp { namespace usb
 		{ return _vendor; }
 		u16 GetProductId() const
 		{ return _product; }
-
+        std::string	 GetPath() const
+        { return _path; }
 		DevicePtr Open(ContextPtr context);
 		DevicePtr TryOpen(ContextPtr context);
 
