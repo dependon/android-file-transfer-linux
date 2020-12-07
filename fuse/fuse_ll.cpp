@@ -53,6 +53,7 @@ namespace
 
 	class FuseWrapper
 	{
+    public:
 		std::mutex		_mutex;
 		bool			_claimInterface;
 		mtp::DevicePtr	_device;
@@ -628,6 +629,10 @@ namespace
 
 		void Rename(fuse_req_t req, FuseId parent, const char *name, FuseId newparent, const char *newname)
 		{
+            mtp::ObjectId parentId = FromFuse(parent);
+            mtp::ObjectId newParentId = FromFuse(newparent);
+
+            _session->SetObjectProperty(parentId, mtp::ObjectProperty::ObjectFilename, newname);
 			fuse_reply_err(req, EXDEV); //return cross-device link, so user space should re-create file and copy it
 		}
 
